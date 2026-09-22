@@ -1,0 +1,6 @@
+{
+  "name": "Recensio AI",
+  "description": "Generatore di recensioni narrative autentiche e Blader Humanizer Studio: rimuove i 25 pattern di scrittura AI per produrre testi genuini, privi di elenchi e slop.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
