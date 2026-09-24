@@ -75,6 +75,7 @@ export interface GeneratedReview {
   productName: string;
   productUrl?: string;
   productImage?: string;
+  isFallback?: boolean;
 }
 
 export interface RefineRequest {

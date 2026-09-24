@@ -7,6 +7,7 @@ import {
   auditTextWithBladerProtocol, 
   humanizeTextLocally 
 } from "./src/lib/humanizerEngine";
+import { generateLocalReviews } from "./src/lib/reviewFallback";
 
 dotenv.config();
 
@@ -124,7 +125,17 @@ app.post("/api/scrape-product", async (req, res) => {
 
     const domain = parsedUrl.hostname.replace("www.", "");
 
-    let scrapedData = {
+    let scrapedData: {
+      url: string;
+      domain: string;
+      title: string;
+      description: string;
+      image: string;
+      siteName: string;
+      price: string;
+      categoryGuess: string;
+      rawTextSnippet?: string;
+    } = {
       url: parsedUrl.toString(),
       domain,
       title: "",
@@ -382,25 +393,62 @@ function auditNoAiSlop(title: string, body: string) {
   };
 }
 
+// Build the final review objects (word count, reading time, slop/humanizer audits)
+// from either the AI-generated drafts or the local fallback drafts.
+function processRawReviews(
+  rawReviews: any[],
+  ctx: { rating: number; tone: string; productName: string; productUrl?: string; scrapedProduct?: any; isFallback?: boolean }
+) {
+  return (rawReviews || []).map((rev, index) => {
+    const bodyClean = (rev.body || "")
+      .replace(/^\s*[-*•]\s+/gm, "") // Strip any accidental bullet markers
+      .replace(/^\s*\d+\.\s+/gm, ""); // Strip any accidental numbered markers
+
+    const words = bodyClean.split(/\s+/).filter(Boolean).length;
+    const readingTime = Math.max(1, Math.ceil(words / 200));
+    const slopAudit = auditNoAiSlop(rev.title || "", bodyClean);
+    const humanizerAudit = auditTextWithBladerProtocol(bodyClean);
+
+    return {
+      id: `rev-${Date.now()}-${index}`,
+      title: rev.title || "Esperienza d'uso del prodotto",
+      body: bodyClean,
+      wordCount: words,
+      readingTimeMinutes: readingTime,
+      authenticityScore: rev.authenticityScore || 95,
+      slopAudit,
+      humanizerAudit,
+      perceivedHighlights: rev.perceivedHighlights || ["Uso reale", "Riflessione personale"],
+      createdAt: new Date().toISOString(),
+      rating: ctx.rating,
+      tone: ctx.tone,
+      productName: ctx.productName || ctx.scrapedProduct?.title || "Prodotto",
+      productUrl: ctx.productUrl || ctx.scrapedProduct?.url,
+      productImage: ctx.scrapedProduct?.image,
+      isFallback: ctx.isFallback || false,
+    };
+  });
+}
+
 // Generate Natural Narrative Product Review(s) with Peter Yang No-AI-Slop Protocol
 app.post("/api/generate-review", async (req, res) => {
-  try {
-    const {
-      productUrl,
-      scrapedProduct,
-      productName,
-      productCategory,
-      rating = 5,
-      tone = "equilibrato",
-      perspective = "Utente quotidiano",
-      usageDuration = "1 mese",
-      length = "media",
-      language = "Italiano",
-      tastePreset = "editorial",
-      customNotes = "",
-      variantsCount = 1,
-    } = req.body;
+  const {
+    productUrl,
+    scrapedProduct,
+    productName,
+    productCategory,
+    rating = 5,
+    tone = "equilibrato",
+    perspective = "Utente quotidiano",
+    usageDuration = "1 mese",
+    length = "media",
+    language = "Italiano",
+    tastePreset = "editorial",
+    customNotes = "",
+    variantsCount = 1,
+  } = req.body;
 
+  try {
     const ai = getGeminiClient();
 
     const targetWords = length === "breve" ? "110-170" : length === "lunga" ? "380-500" : "220-320";
@@ -522,41 +570,51 @@ La durata selezionata è solo un'indicazione e non dimostra che l'utente abbia d
       return res.status(500).json({ error: "Errore durante la generazione della recensione strutturata. Riprova tra poco." });
     }
 
-    const processedReviews = (parsedJson.reviews || []).map((rev, index) => {
-      const bodyClean = (rev.body || "")
-        .replace(/^\s*[-*•]\s+/gm, "") // Strip any accidental bullet markers
-        .replace(/^\s*\d+\.\s+/gm, ""); // Strip any accidental numbered markers
+    const processedReviews = processRawReviews(parsedJson.reviews, {
+      rating,
+      tone,
+      productName,
+      productUrl,
+      scrapedProduct,
+      isFallback: false,
+    });
 
-      const words = bodyClean.split(/\s+/).filter(Boolean).length;
-      const readingTime = Math.max(1, Math.ceil(words / 200));
-      const slopAudit = auditNoAiSlop(rev.title || "", bodyClean);
-      const humanizerAudit = auditTextWithBladerProtocol(bodyClean);
-
-      return {
-        id: `rev-${Date.now()}-${index}`,
-        title: rev.title || "Esperienza d'uso del prodotto",
-        body: bodyClean,
-        wordCount: words,
-        readingTimeMinutes: readingTime,
-        authenticityScore: rev.authenticityScore || 95,
-        slopAudit,
-        humanizerAudit,
-        perceivedHighlights: rev.perceivedHighlights || ["Uso reale", "Riflessione personale"],
-        createdAt: new Date().toISOString(),
+    res.json({ success: true, reviews: processedReviews, isFallback: false });
+  } catch (error: any) {
+    console.warn(
+      "Generazione con modello primario non disponibile, applicazione motore di generazione locale istantanea:",
+      error?.message || error
+    );
+    try {
+      const rawFallbackReviews = generateLocalReviews({
+        productName: productName || scrapedProduct?.title || "questo prodotto",
+        productDescription: scrapedProduct?.description,
+        productCategory,
         rating,
         tone,
-        productName: productName || scrapedProduct?.title || "Prodotto",
-        productUrl: productUrl || scrapedProduct?.url,
-        productImage: scrapedProduct?.image,
-      };
-    });
+        perspective,
+        usageDuration,
+        tastePreset,
+        customNotes,
+        variantsCount,
+      });
 
-    res.json({ success: true, reviews: processedReviews });
-  } catch (error: any) {
-    console.error("Generazione recensione non disponibile:", error?.message || error);
-    return res.status(503).json({
-      error: "Il servizio AI non è disponibile. Nessun testo è stato generato: riprova tra poco.",
-    });
+      const processedReviews = processRawReviews(rawFallbackReviews, {
+        rating,
+        tone,
+        productName,
+        productUrl,
+        scrapedProduct,
+        isFallback: true,
+      });
+
+      res.json({ success: true, reviews: processedReviews, isFallback: true });
+    } catch (localErr: any) {
+      console.error("Errore anche nella generazione locale:", localErr);
+      return res.status(503).json({
+        error: "Il servizio AI non è disponibile. Nessun testo è stato generato: riprova tra poco.",
+      });
+    }
   }
 });
 

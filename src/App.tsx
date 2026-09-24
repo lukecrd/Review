@@ -104,7 +104,9 @@ export default function App() {
     }
     const controller = new AbortController();
     generateAbortControllerRef.current = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 16000);
+    // Server-side retry tries up to 4 models at ~7.5s each (worst case ~30s),
+    // so the client timeout must stay comfortably above that.
+    const timeoutId = setTimeout(() => controller.abort(), 34000);
 
     try {
       const response = await fetch('/api/generate-review', {
@@ -155,7 +157,9 @@ export default function App() {
 
     setIsRefining(true);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 14000);
+    // Same rationale as handleGenerateReviews: stay above the server's
+    // worst-case sequential model retry time (~30s).
+    const timeoutId = setTimeout(() => controller.abort(), 34000);
 
     try {
       const response = await fetch('/api/refine-review', {

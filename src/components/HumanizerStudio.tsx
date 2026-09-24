@@ -83,7 +83,9 @@ export const HumanizerStudio: React.FC<HumanizerStudioProps> = ({
     }
     const controller = new AbortController();
     humanizeAbortControllerRef.current = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 16000);
+    // Server-side retry tries up to 4 models at ~7.5s each (worst case ~30s),
+    // so the client timeout must stay comfortably above that.
+    const timeoutId = setTimeout(() => controller.abort(), 34000);
 
     try {
       const res = await fetch('/api/humanize', {

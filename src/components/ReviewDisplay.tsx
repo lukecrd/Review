@@ -117,6 +117,15 @@ export const ReviewDisplay: React.FC<ReviewDisplayProps> = ({
               <span>100% Prosa Naturale</span>
             </span>
 
+            {currentReview.isFallback && (
+              <span
+                className="px-3 py-1 rounded-full bg-stone-100 text-stone-600 border border-stone-200 text-xs font-semibold whitespace-nowrap"
+                title="Il servizio AI non era disponibile: questa bozza è stata generata dal motore locale istantaneo usando solo i fatti forniti."
+              >
+                Bozza dal motore locale istantaneo
+              </span>
+            )}
+
             <button
               type="button"
               onClick={() => setShowAuditDetails(!showAuditDetails)}
