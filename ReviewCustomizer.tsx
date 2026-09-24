@@ -358,21 +358,21 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
 
       </div>
 
-      {/* Product and firsthand details are required to avoid invented claims. */}
+      {/* Optional firsthand details improve the draft without blocking generation. */}
       <div>
         <label className="text-xs font-bold text-stone-800 block mb-1.5">
-          Cosa hai osservato davvero sul prodotto? (Obbligatorio)
+          Dettagli della tua esperienza (facoltativi)
         </label>
         <textarea
           value={options.customNotes || ''}
           onChange={(e) =>
             onChangeOptions({ ...options, customNotes: e.target.value })
           }
-          placeholder="Scrivi caratteristiche verificate e la tua esperienza: cosa hai usato, cosa ha funzionato e cosa no. La bozza non aggiungerà dettagli che non inserisci."
+          placeholder="Aggiungi cosa hai usato, cosa ha funzionato o cosa non ti è piaciuto. Senza note personali, la bozza resterà descrittiva e basata sui dati del prodotto."
           rows={3}
           className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
         />
-        <p className="mt-1.5 text-[11px] text-stone-500">L'AI usa queste note per i giudizi personali; i dati della pagina servono solo a identificare il prodotto.</p>
+        <p className="mt-1.5 text-[11px] text-stone-500">Le note servono per descrivere la tua esperienza. Senza note, l'AI non dirà di aver provato il prodotto.</p>
       </div>
 
       {/* Taste-Skill Anti-Slop Protocol Guarantee Banner */}
