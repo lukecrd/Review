@@ -1,6 +1,6 @@
 import React from 'react';
 import { Star, Sliders, MessageSquare, Clock, User, AlignLeft, Globe, Layers, Sparkles, Compass, Check, Target, Package } from 'lucide-react';
-import { ReviewOptions, ReviewTone, ReviewLength, TasteSkillPreset, ReviewFocusAspect } from '../types';
+import { ReviewOptions, ReviewTone, ReviewLength, TasteSkillPreset, ReviewFocusAspect, ExperienceAnswers } from '../types';
 
 interface ReviewCustomizerProps {
   options: ReviewOptions;
@@ -95,6 +95,23 @@ const LANGUAGES = [
   { code: 'Deutsch', name: 'Deutsch 🇩🇪' },
 ];
 
+const EXPERIENCE_QUESTIONS: Array<{
+  key: keyof ExperienceAnswers;
+  label: string;
+  placeholder: string;
+}> = [
+  { key: 'purpose', label: 'Per cosa lo usi?', placeholder: 'es. Colazione per quattro persone, tutte le mattine' },
+  { key: 'decisive', label: 'Cosa ti ha convinto?', placeholder: 'es. Si pulisce in un minuto e sta nel pensile' },
+  { key: 'comparison', label: 'Con cosa lo confronti o cosa usavi prima?', placeholder: 'es. Il vecchio modello faceva più rumore' },
+  { key: 'annoyance', label: 'Cosa non ti convince?', placeholder: 'es. Il cavo è corto, la prima volta fa odore di nuovo' },
+  { key: 'wouldChange', label: 'Cosa cambieresti?', placeholder: 'es. Un coperchio con chiusura più solida' },
+];
+
+const VOICE_SAMPLE_MAX = 3000;
+const LONG_MIN_WORDS_HINT = 80;
+
+const countWords = (text?: string) => (text || '').split(/\s+/).filter(Boolean).length;
+
 export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
   options,
   onChangeOptions,
@@ -113,6 +130,15 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
   const handleTastePresetChange = (preset: TasteSkillPreset) => {
     onChangeOptions({ ...options, tastePreset: preset });
   };
+
+  const setExperience = (key: keyof ExperienceAnswers, value: string) => {
+    onChangeOptions({ ...options, experience: { ...(options.experience || {}), [key]: value } });
+  };
+
+  const personalWords =
+    countWords(options.customNotes) +
+    Object.values(options.experience || {}).reduce((sum, v) => sum + countWords(v), 0);
+  const showLengthHint = options.length === 'lunga' && personalWords < LONG_MIN_WORDS_HINT;
 
   const handleFocusChange = (focus: ReviewFocusAspect) => {
     onChangeOptions({ ...options, focusAspect: focus });
@@ -425,20 +451,73 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
 
       </div>
 
-      {/* Optional Custom Anecdotes */}
+      {/* Guided personal experience: the only source of first-person content */}
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-bold text-stone-800 flex items-center space-x-1.5">
+            <AlignLeft className="w-3.5 h-3.5 text-indigo-600" />
+            <span>La tua esperienza (opzionale):</span>
+          </label>
+          <p className="text-[11px] text-stone-500 mt-1 leading-relaxed">
+            Sono le uniche informazioni personali che la recensione può usare. Più dettagli veri inserisci, più il testo sarà lungo e credibile.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {EXPERIENCE_QUESTIONS.map((q) => (
+            <div key={q.key}>
+              <label className="text-[11px] font-semibold text-stone-700 block mb-1">{q.label}</label>
+              <textarea
+                rows={2}
+                maxLength={500}
+                value={options.experience?.[q.key] || ''}
+                onChange={(e) => setExperience(q.key, e.target.value)}
+                placeholder={q.placeholder}
+                className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <label className="text-[11px] font-semibold text-stone-700 block mb-1">
+            Altre note libere:
+          </label>
+          <input
+            type="text"
+            maxLength={1500}
+            value={options.customNotes || ''}
+            onChange={(e) => onChangeOptions({ ...options, customNotes: e.target.value })}
+            placeholder="Qualsiasi altro dettaglio che vuoi far comparire"
+            className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+          />
+        </div>
+
+        {showLengthHint && (
+          <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 leading-relaxed">
+            Per una recensione lunga servono più dettagli. Con poche informazioni il testo resterà sotto le 700-900 parole, perché il sistema non inventa esperienze.
+          </p>
+        )}
+      </div>
+
+      {/* Voice sample: style model only, never a source of facts */}
       <div>
-        <label className="text-xs font-bold text-stone-800 block mb-1.5">
-          Dettagli o aneddoti personali da includere (Opzionale):
+        <label className="text-xs font-bold text-stone-800 flex items-center space-x-1.5 mb-1.5">
+          <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
+          <span>Campione della tua voce (opzionale):</span>
         </label>
-        <input
-          type="text"
-          value={options.customNotes || ''}
-          onChange={(e) =>
-            onChangeOptions({ ...options, customNotes: e.target.value })
-          }
-          placeholder="es. Usato per colazione in famiglia, oppure confrontato con modello precedente..."
-          className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+        <textarea
+          rows={5}
+          maxLength={VOICE_SAMPLE_MAX}
+          value={options.voiceSample || ''}
+          onChange={(e) => onChangeOptions({ ...options, voiceSample: e.target.value })}
+          placeholder="Incolla uno o due testi che hai scritto tu, ad esempio vecchie recensioni o messaggi. Servono solo per imitare ritmo e lessico; i loro contenuti non vengono riutilizzati."
+          className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
         />
+        <div className="flex items-center justify-between text-[10px] text-stone-500 mt-1">
+          <span>Viene ricordato in questo browser per le prossime volte.</span>
+          <span>{(options.voiceSample || '').length} / {VOICE_SAMPLE_MAX} caratteri</span>
+        </div>
       </div>
 
       {/* Taste-Skill Anti-Slop Protocol Guarantee Banner */}

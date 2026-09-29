@@ -12,6 +12,7 @@ import { ScrapedProduct, ReviewOptions, GeneratedReview } from './types';
 import { Sparkles, ShieldCheck, Compass, Zap } from 'lucide-react';
 
 const STORAGE_KEY = 'recensio_ai_saved_reviews_v1';
+const VOICE_KEY = 'recensio_ai_voice_sample_v1';
 
 export default function App() {
   const [currentMode, setCurrentMode] = useState<'reviews' | 'humanizer'>('reviews');
@@ -55,6 +56,27 @@ export default function App() {
       console.warn('Impossibile caricare la cronologia da localStorage:', err);
     }
   }, []);
+
+  // Il campione di voce viene ricordato tra una sessione e l'altra
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(VOICE_KEY);
+      if (stored) setReviewOptions((prev) => ({ ...prev, voiceSample: stored }));
+    } catch (err) {
+      console.warn('Impossibile caricare il campione di voce:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    const v = reviewOptions.voiceSample;
+    if (typeof v !== 'string') return; // non ancora caricato o mai impostato
+    try {
+      if (v) localStorage.setItem(VOICE_KEY, v);
+      else localStorage.removeItem(VOICE_KEY);
+    } catch (err) {
+      console.warn('Impossibile salvare il campione di voce:', err);
+    }
+  }, [reviewOptions.voiceSample]);
 
   // Sync saved reviews to localStorage
   const updateSavedReviews = (newList: GeneratedReview[]) => {
@@ -104,9 +126,9 @@ export default function App() {
     }
     const controller = new AbortController();
     generateAbortControllerRef.current = controller;
-    // Server-side retry tries up to 4 models at ~7.5s each (worst case ~30s),
-    // so the client timeout must stay comfortably above that.
-    const timeoutId = setTimeout(() => controller.abort(), 34000);
+    // Il server ha un budget totale di tempo (fino a 45s per la lunghezza "lunga",
+    // vedi generationBudgetMs in server.ts): il client deve restare sopra questo valore.
+    const timeoutId = setTimeout(() => controller.abort(), 52000);
 
     try {
       const response = await fetch('/api/generate-review', {

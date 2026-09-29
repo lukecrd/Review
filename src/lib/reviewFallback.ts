@@ -1,15 +1,14 @@
 /**
  * Local, deterministic fallback for /api/generate-review.
  *
- * This mirrors the role of `humanizeTextLocally` in humanizerEngine.ts: if the
- * Gemini API is unavailable, slow, or times out, the app should still be able
- * to produce a usable draft instantly instead of only showing an error. This
- * keeps the promise made to the user in the UI ("Riprova: subentrerà la
- * generazione istantanea") true in practice.
+ * If the Gemini API is unavailable, slow, or times out, the app still produces
+ * a usable draft instead of only showing an error.
  *
- * It never invents facts: it only recombines what was actually provided
- * (product name/description/notes), so it is intentionally plainer than an
- * AI-generated draft.
+ * Rule: the fallback NEVER states an experience the user did not provide.
+ * - Without personal material (free notes or guided answers) it writes a neutral,
+ *   third-person description based on the product page only.
+ * - With personal material it reuses the user's own words, without adding
+ *   duration of use, purchase, testing or feelings of its own.
  */
 
 export interface ReviewFallbackParams {
@@ -22,7 +21,9 @@ export interface ReviewFallbackParams {
   usageDuration: string;
   tastePreset?: string;
   customNotes?: string;
+  experience?: Record<string, string>;
   variantsCount: number;
+  length?: 'breve' | 'media' | 'lunga';
 }
 
 export interface ReviewFallbackResult {
@@ -32,43 +33,33 @@ export interface ReviewFallbackResult {
   perceivedHighlights: string[];
 }
 
-const RATING_SENTIMENT: Record<number, string[]> = {
-  5: [
-    'Sono rimasto soddisfatto fin dal primo utilizzo',
-    "L'impressione generale è stata molto positiva",
-  ],
-  4: [
-    "Nel complesso l'esperienza è stata buona, con qualche piccolo margine di miglioramento",
-    'Mi sono trovato bene, anche se non è tutto perfetto',
-  ],
-  3: [
-    "L'esperienza è stata nella media, tra aspetti positivi e altri più deboli",
-    'Ci sono luci e ombre in questo utilizzo',
-  ],
-  2: [
-    'Alcuni aspetti mi hanno lasciato perplesso',
-    "L'esperienza non è stata all'altezza delle aspettative",
-  ],
-  1: [
-    'Sono rimasto deluso da diversi aspetti',
-    "L'esperienza è stata piuttosto insoddisfacente",
-  ],
+const RATING_PHRASE: Record<number, string> = {
+  5: 'un giudizio molto positivo',
+  4: 'un giudizio positivo, con qualche riserva',
+  3: 'un giudizio intermedio',
+  2: 'un giudizio piuttosto negativo',
+  1: 'un giudizio negativo',
 };
 
-const OPENERS = [
-  (name: string) => `Uso ${name} da un po' di tempo ormai.`,
-  (name: string) => `Ho deciso di provare ${name} dopo aver cercato qualcosa di adatto alle mie esigenze.`,
-  (name: string) => `${name} è entrato nella mia routine quotidiana da qualche tempo.`,
-];
-
-function pick<T>(arr: T[], seed: number): T {
-  return arr[seed % arr.length];
-}
+// Ordine di presentazione delle risposte guidate (stesse chiavi usate dal server).
+const EXPERIENCE_ORDER = ['purpose', 'decisive', 'comparison', 'annoyance', 'wouldChange'];
 
 function truncateFact(text: string, maxLen: number): string {
   const clean = text.replace(/\s+/g, ' ').trim();
   if (clean.length <= maxLen) return clean;
-  return `${clean.slice(0, maxLen).trim()}...`;
+  const cut = clean.slice(0, maxLen);
+  // Preferisce chiudere all'ultima frase completa, se ce n'è una ragionevolmente lunga.
+  const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+  if (lastStop > maxLen * 0.4) return cut.slice(0, lastStop + 1).trim();
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${(lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trim()}...`;
+}
+
+function asSentence(text: string): string {
+  const t = text.replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const capitalized = t.charAt(0).toUpperCase() + t.slice(1);
+  return /[.!?…]$/.test(capitalized) ? capitalized : `${capitalized}.`;
 }
 
 export function generateLocalReviews(params: ReviewFallbackParams): ReviewFallbackResult[] {
@@ -76,60 +67,69 @@ export function generateLocalReviews(params: ReviewFallbackParams): ReviewFallba
     productName,
     productDescription,
     rating,
-    perspective,
-    usageDuration,
     customNotes,
+    experience,
     variantsCount,
+    length = 'media',
   } = params;
 
   const safeRating = Math.min(5, Math.max(1, Math.round(rating) || 3));
   const count = Math.min(3, Math.max(1, variantsCount || 1));
   const name = productName || 'questo prodotto';
 
+  // La lunghezza cresce solo includendo più testo di ciò che è stato realmente fornito.
+  const descLimit = length === 'breve' ? 320 : length === 'lunga' ? 1400 : 700;
+  const notesLimit = length === 'breve' ? 500 : length === 'lunga' ? 3000 : 1200;
+
+  const description = productDescription?.trim()
+    ? truncateFact(productDescription, descLimit)
+    : '';
+  const notes = customNotes?.trim() ? truncateFact(customNotes, notesLimit) : '';
+  const answers = EXPERIENCE_ORDER
+    .map((k) => experience?.[k]?.trim())
+    .filter((v): v is string => !!v)
+    .map(asSentence);
+
+  const hasPersonalMaterial = !!notes || answers.length > 0;
+  const ratingLine = `Valutazione: ${safeRating} su 5, ${RATING_PHRASE[safeRating]}.`;
+
   const results: ReviewFallbackResult[] = [];
 
   for (let i = 0; i < count; i++) {
-    const opener = pick(OPENERS, i)(name);
-    const sentiment = pick(RATING_SENTIMENT[safeRating], i);
-
     const paragraphs: string[] = [];
 
-    paragraphs.push(
-      `${opener} ${sentiment}, considerando il contesto d'uso indicato (${perspective.toLowerCase()}) e il periodo di prova (${usageDuration.toLowerCase()}).`
-    );
+    const personalParagraphs: string[] = [];
+    if (answers.length > 0) personalParagraphs.push(answers.join(' '));
+    if (notes) personalParagraphs.push(notes);
 
-    if (productDescription && productDescription.trim()) {
-      paragraphs.push(
-        `Dalla scheda del prodotto emergono queste caratteristiche principali: ${truncateFact(productDescription, 320)}`
-      );
-    }
-
-    if (customNotes && customNotes.trim()) {
-      paragraphs.push(truncateFact(customNotes, 500));
+    if (hasPersonalMaterial) {
+      // Le varianti cambiano l'ordine di presentazione, non i contenuti.
+      const descBlock = description ? [description] : [];
+      if (i % 2 === 0) {
+        paragraphs.push(...personalParagraphs, ...descBlock);
+      } else {
+        paragraphs.push(...descBlock, ...personalParagraphs);
+      }
+    } else if (description) {
+      paragraphs.push(description);
     } else {
       paragraphs.push(
-        'Non ho aggiunto note personali specifiche su questo utilizzo: questa bozza resta quindi descrittiva e basata sulle informazioni disponibili sul prodotto, senza inventare dettagli d\'uso.'
+        `[DATO MANCANTE] Per ${name} non ci sono informazioni sufficienti: aggiungi note o risposte guidate per ottenere una bozza utile.`
       );
     }
 
-    const closing =
-      safeRating >= 4
-        ? 'Per il momento è un acquisto che rifarei.'
-        : safeRating === 3
-        ? 'Vedremo con l\'uso prolungato se qualche aspetto migliorerà.'
-        : 'Al momento non mi sento di consigliarlo senza riserve.';
-    paragraphs.push(closing);
+    if (hasPersonalMaterial || description) paragraphs.push(ratingLine);
 
     const body = paragraphs.filter(Boolean).join('\n\n');
     const words = body.split(/\s+/).filter(Boolean).length;
 
     results.push({
-      title: `${name}: la mia esperienza dopo ${usageDuration.toLowerCase()}`,
+      title: `${name}: bozza di recensione`,
       body,
       authenticityScore: 88,
       perceivedHighlights: [
         'Bozza generata dal motore locale istantaneo',
-        'Basata solo sui fatti forniti',
+        hasPersonalMaterial ? 'Basata sui tuoi testi e sulla scheda prodotto' : 'Basata solo sulla scheda prodotto',
         `${words} parole`,
       ],
     });

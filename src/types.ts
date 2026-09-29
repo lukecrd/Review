@@ -37,6 +37,14 @@ export type ReviewFocusAspect =
   | 'durata_manutenzione'
   | 'valore';
 
+export interface ExperienceAnswers {
+  purpose?: string;     // per cosa lo usa
+  decisive?: string;    // cosa l'ha convinto / cosa apprezza
+  annoyance?: string;   // cosa non convince / ha dato fastidio
+  comparison?: string;  // con cosa l'ha confrontato / cosa usava prima
+  wouldChange?: string; // cosa cambierebbe
+}
+
 export interface ReviewOptions {
   productUrl: string;
   scrapedProduct?: ScrapedProduct | null;
@@ -53,6 +61,8 @@ export interface ReviewOptions {
   length: ReviewLength;
   language: string; // e.g., 'Italiano'
   customNotes?: string;
+  experience?: ExperienceAnswers;
+  voiceSample?: string; // testo scritto dall'utente, usato solo come modello di stile
   variantsCount: number; // 1, 2, or 3
   noAiSlopStrict?: boolean;
 }
