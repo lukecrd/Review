@@ -29,6 +29,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   );
 
   const handleCopy = async (rev: GeneratedReview) => {
+    if (rev.hasPersonalMaterial === false) return; // bozza descrittiva: non esportabile
     try {
       await navigator.clipboard.writeText(`${rev.title}\n\n${rev.body}`);
       setCopiedId(rev.id);
@@ -128,8 +129,9 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
                     <button
                       onClick={() => handleCopy(rev)}
-                      className="p-1.5 rounded-lg bg-white text-slate-600 hover:text-indigo-600 border border-slate-200 transition-colors cursor-pointer shadow-xs"
-                      title="Copia"
+                      disabled={rev.hasPersonalMaterial === false}
+                      className="p-1.5 rounded-lg bg-white text-slate-600 hover:text-indigo-600 border border-slate-200 transition-colors cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                      title={rev.hasPersonalMaterial === false ? 'Bozza descrittiva senza esperienza personale: non copiabile' : 'Copia'}
                     >
                       {copiedId === rev.id ? (
                         <Check className="w-3.5 h-3.5 text-emerald-600" />

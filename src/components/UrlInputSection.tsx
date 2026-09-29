@@ -38,10 +38,7 @@ const SAMPLE_PRODUCTS: Array<{
       'Gruppo infusore compatto completamente estraibile e lavabile sotto il rubinetto',
       'Serbatoio d\'acqua frontale da 1,8 litri con erogatore caffè regolabile in altezza',
     ],
-    practicalQuirks: [
-      'Risciacquo automatico dei condotti ad ogni accensione e spegnimento (riempie velocemente la vaschetta raccogligocce)',
-      'Rumorosità secca del macinatore per circa 8-10 secondi all\'avvio dell\'estrazione',
-    ],
+    practicalQuirks: [],
   },
   {
     name: 'Cuffie Bose QuietComfort',
@@ -60,10 +57,7 @@ const SAMPLE_PRODUCTS: Array<{
       'Connessione multipoint Bluetooth per passare all\'istante tra laptop e smartphone',
       'Equalizzatore a tre bande regolabile con precisione dall\'app Bose',
     ],
-    practicalQuirks: [
-      'Custodia protettiva rigida di trasporto leggermente ingombrante in zaini sottili',
-      'Pulsanti fisici sui padiglioni con scatto un po\' rigido durante le prime settimane',
-    ],
+    practicalQuirks: [],
   },
   {
     name: 'Nike Pegasus 40 Corsa',
@@ -82,10 +76,7 @@ const SAMPLE_PRODUCTS: Array<{
       'Battistrada in gomma anti-abrasione con motivo waffle per trazione su asfalto umido',
       'Differenziale tacco-punta (drop) di 10 mm bilanciato per corse medie e lunghe',
     ],
-    practicalQuirks: [
-      'Calzata aderente sul collo del piede che richiede mezzo numero in più per chi ha pianta larga',
-      'Talloniera piuttosto strutturata che necessita di 10-15 km di rodaggio per cedere',
-    ],
+    practicalQuirks: [],
   },
   {
     name: 'Friggitrice ad Aria Cosori 5.5L',
@@ -104,10 +95,7 @@ const SAMPLE_PRODUCTS: Array<{
       'Funzione automatica di preriscaldamento (Preheat) e promemoria sonoro "Shake"',
       'Cestello e contro-cestello lavabili in lavastoviglie privi di BPA e PFOA',
     ],
-    practicalQuirks: [
-      'Durante i primi due cicli di cottura emette un leggero odore di plastica nuova da sfogare a vuoto',
-      'Ventola di convezione con rumorosità sui 65 dB durante la fase di massima potenza',
-    ],
+    practicalQuirks: [],
   },
 ];
 
@@ -126,6 +114,7 @@ export const UrlInputSection: React.FC<UrlInputSectionProps> = ({
   const [newFeatureInput, setNewFeatureInput] = useState('');
   const [newQuirkInput, setNewQuirkInput] = useState('');
   const [isEnriching, setIsEnriching] = useState(false);
+  const [manualText, setManualText] = useState('');
 
   const handleFetchUrl = async (urlToFetch?: string) => {
     const targetUrl = (urlToFetch || inputUrl).trim();
@@ -180,6 +169,18 @@ export const UrlInputSection: React.FC<UrlInputSectionProps> = ({
     onProductScraped(scraped);
     setEditedTitle(sample.title);
     setEditedCategory(sample.category);
+  };
+
+  const handleUseManualData = () => {
+    if (!currentProduct || !manualText.trim()) return;
+    onProductScraped({
+      ...currentProduct,
+      description: manualText.trim().slice(0, 6000),
+      rawTextSnippet: '',
+      needsManualInput: false,
+      manualReason: undefined,
+    });
+    setManualText('');
   };
 
   const handleSaveEdits = () => {
@@ -309,7 +310,7 @@ export const UrlInputSection: React.FC<UrlInputSectionProps> = ({
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleFetchUrl()}
-              placeholder="Incolla l'URL del prodotto... es. https://amazon.it/dp/B00400OMU0"
+              placeholder="Incolla l'URL del prodotto, ad esempio https://www.negozio.it/prodotto"
               className="w-full pl-10 pr-24 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 placeholder-stone-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono"
             />
             <Link2 className="absolute left-3.5 top-3.5 w-4 h-4 text-stone-400" />
@@ -352,7 +353,7 @@ export const UrlInputSection: React.FC<UrlInputSectionProps> = ({
       {/* Quick Sample Presets */}
       <div className="pt-3 border-t border-stone-100">
         <span className="text-[11px] font-bold text-stone-400 uppercase tracking-widest block mb-2">
-          Oppure seleziona un prodotto test pronto con scheda tecnica reale:
+          Oppure prova con un prodotto di esempio (dati dimostrativi, non verificati):
         </span>
         <div className="flex flex-wrap gap-2">
           {SAMPLE_PRODUCTS.map((sample, idx) => (
@@ -485,6 +486,37 @@ export const UrlInputSection: React.FC<UrlInputSectionProps> = ({
             </div>
           </div>
 
+          {/* Dati da incollare: la scheda non è stata scaricata (Amazon) o non conteneva dati */}
+          {currentProduct.needsManualInput && (
+            <div className="pt-3 border-t border-stone-200/80 space-y-2">
+              <p className="text-xs text-stone-700 leading-relaxed">
+                {currentProduct.manualReason === 'amazon'
+                  ? "Per i link Amazon l'app non scarica la pagina. Copia dalla scheda prodotto il nome, la descrizione e le caratteristiche, poi incollali qui sotto. Il nome si corregge con «Modifica nome o categoria»."
+                  : 'Non è stato possibile leggere i dati della pagina. Incolla qui sotto descrizione e caratteristiche prese dalla scheda del prodotto.'}
+              </p>
+              <textarea
+                rows={5}
+                maxLength={6000}
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                placeholder="Incolla qui la descrizione e le caratteristiche del prodotto"
+                className="w-full px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-stone-500">{manualText.length} / 6000 caratteri</span>
+                <button
+                  type="button"
+                  onClick={handleUseManualData}
+                  disabled={!manualText.trim()}
+                  className="px-5 py-2.5 bg-stone-900 hover:bg-stone-800 text-white font-semibold text-xs rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap shadow-2xs"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Usa questi dati</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Real Technical Features Section */}
           <div className="pt-3 border-t border-stone-200/80 space-y-2">
             <div className="flex items-center justify-between">
@@ -541,7 +573,7 @@ export const UrlInputSection: React.FC<UrlInputSectionProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-stone-700 flex items-center space-x-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                  <span>Sfumature d'uso pratico & piccoli compromessi (per credibilità):</span>
+                  <span>Limiti o difetti che hai riscontrato tu (solo se reali):</span>
                 </span>
               </div>
 
@@ -569,7 +601,7 @@ export const UrlInputSection: React.FC<UrlInputSectionProps> = ({
                   type="text"
                   value={newQuirkInput}
                   onChange={(e) => setNewQuirkInput(e.target.value)}
-                  placeholder="+ Aggiungi compromesso reale (es. 'Vaschetta che si riempie presto', 'App solo in inglese')..."
+                  placeholder="+ Aggiungi un limite riscontrato di persona (es. 'Cavo troppo corto')..."
                   className="flex-1 px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
                 <button

@@ -10,7 +10,9 @@ export interface ScrapedProduct {
   categoryGuess?: string;
   rawTextSnippet?: string;
   keyFeatures?: string[];
-  practicalQuirks?: string[];
+  practicalQuirks?: string[]; // limiti o difetti riscontrati dall'utente (solo se inseriti da lui)
+  needsManualInput?: boolean; // la scheda non è stata scaricata: i dati vanno incollati dall'utente
+  manualReason?: string;
 }
 
 export type ReviewTone = 
@@ -100,6 +102,8 @@ export interface GeneratedReview {
   productUrl?: string;
   productImage?: string;
   isFallback?: boolean;
+  // false = la bozza non contiene alcun materiale personale dell'utente (note, risposte guidate, limiti riscontrati)
+  hasPersonalMaterial?: boolean;
 }
 
 export interface RefineRequest {

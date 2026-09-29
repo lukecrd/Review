@@ -14,6 +14,8 @@
 export interface ReviewFallbackParams {
   productName: string;
   productDescription?: string;
+  productFeatures?: string[];
+  userQuirks?: string[]; // limiti riscontrati e inseriti dall'utente
   productCategory?: string;
   rating: number;
   tone: string;
@@ -66,6 +68,8 @@ export function generateLocalReviews(params: ReviewFallbackParams): ReviewFallba
   const {
     productName,
     productDescription,
+    productFeatures,
+    userQuirks,
     rating,
     customNotes,
     experience,
@@ -81,14 +85,23 @@ export function generateLocalReviews(params: ReviewFallbackParams): ReviewFallba
   const descLimit = length === 'breve' ? 320 : length === 'lunga' ? 1400 : 700;
   const notesLimit = length === 'breve' ? 500 : length === 'lunga' ? 3000 : 1200;
 
-  const description = productDescription?.trim()
+  const descriptionText = productDescription?.trim()
     ? truncateFact(productDescription, descLimit)
     : '';
+  const featureItems = (productFeatures || []).map((f) => f.trim()).filter(Boolean);
+  const featuresText = featureItems.length
+    ? `Caratteristiche indicate: ${featureItems.join('; ')}.`
+    : '';
+  const description = [descriptionText, featuresText].filter(Boolean).join('\n\n');
   const notes = customNotes?.trim() ? truncateFact(customNotes, notesLimit) : '';
   const answers = EXPERIENCE_ORDER
     .map((k) => experience?.[k]?.trim())
     .filter((v): v is string => !!v)
     .map(asSentence);
+  for (const q of userQuirks || []) {
+    const sentence = asSentence(q);
+    if (sentence) answers.push(sentence);
+  }
 
   const hasPersonalMaterial = !!notes || answers.length > 0;
   const ratingLine = `Valutazione: ${safeRating} su 5, ${RATING_PHRASE[safeRating]}.`;

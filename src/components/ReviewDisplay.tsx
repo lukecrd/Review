@@ -32,7 +32,13 @@ export const ReviewDisplay: React.FC<ReviewDisplayProps> = ({
   const slopAudit = currentReview.slopAudit;
   const bladerAudit = currentReview.humanizerAudit || auditTextWithBladerProtocol(currentReview.body);
 
+  // Senza materiale personale dell'utente il testo resta una bozza descrittiva: niente copia né download.
+  const exportBlocked = currentReview.hasPersonalMaterial === false;
+  const EXPORT_BLOCKED_HINT =
+    'Bozza descrittiva senza le tue note: aggiungi la tua esperienza nella fase 2 e rigenera per poterla copiare o scaricare.';
+
   const handleCopy = async (rev: GeneratedReview) => {
+    if (rev.hasPersonalMaterial === false) return;
     const fullText = `${rev.title}\n\n${rev.body}`;
     try {
       await navigator.clipboard.writeText(fullText);
@@ -67,7 +73,8 @@ export const ReviewDisplay: React.FC<ReviewDisplayProps> = ({
   };
 
   const handleDownloadTxt = (rev: GeneratedReview) => {
-    const content = `TITOLO: ${rev.title}\nVALUTAZIONE: ${rev.rating}/5 Stelle\nPRODOTTO: ${rev.productName}\nDATA: ${new Date(rev.createdAt).toLocaleDateString('it-IT')}\n\n${rev.body}`;
+    if (rev.hasPersonalMaterial === false) return;
+    const content = `STATO: BOZZA. Pubblicala solo se rispecchia un tuo utilizzo reale del prodotto.\nTITOLO: ${rev.title}\nVALUTAZIONE: ${rev.rating}/5 Stelle\nPRODOTTO: ${rev.productName}\nDATA: ${new Date(rev.createdAt).toLocaleDateString('it-IT')}\n\n${rev.body}`;
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -81,8 +88,6 @@ export const ReviewDisplay: React.FC<ReviewDisplayProps> = ({
     '⚡ Blader Humanizer (Rimuovi 25 Tell AI)',
     '🛡️ Pulisci da ogni AI Slop (Regole Peter Yang)',
     '🎯 Più diretta al prodotto e meno personale',
-    '🌿 Aggiungi un aneddoto spontaneo di vita quotidiana',
-    '⚖️ Inserisci un piccolo limite d\'uso per credibilità',
     '⚡ Accorcia e rendi più incisiva',
     '☕ Tono più colloquiale e spontaneo',
   ];
@@ -279,6 +284,25 @@ export const ReviewDisplay: React.FC<ReviewDisplayProps> = ({
             </div>
           </div>
 
+          {/* Stato bozza: sempre visibile */}
+          <div
+            className={`px-3.5 py-2.5 rounded-xl border text-xs leading-relaxed ${
+              exportBlocked
+                ? 'bg-amber-50 border-amber-200 text-amber-900'
+                : 'bg-stone-50 border-stone-200 text-stone-700'
+            }`}
+          >
+            {exportBlocked ? (
+              <span>
+                <strong className="font-semibold">Bozza non esportabile.</strong> Questo testo descrive solo la scheda del prodotto, senza alcuna tua esperienza. {EXPORT_BLOCKED_HINT}
+              </span>
+            ) : (
+              <span>
+                <strong className="font-semibold">Bozza da verificare.</strong> Pubblicala solo se rispecchia un tuo utilizzo reale del prodotto.
+              </span>
+            )}
+          </div>
+
           {/* Catchy Editorial Review Title */}
           <h3 className="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight leading-snug">
             "{currentReview.title}"
@@ -323,7 +347,9 @@ export const ReviewDisplay: React.FC<ReviewDisplayProps> = ({
           {/* Copy Button */}
           <button
             onClick={() => handleCopy(currentReview)}
-            className="px-5 py-2.5 bg-stone-900 hover:bg-stone-800 text-white font-semibold text-xs sm:text-sm rounded-xl transition-all flex items-center space-x-2 cursor-pointer shadow-xs whitespace-nowrap"
+            disabled={exportBlocked}
+            title={exportBlocked ? EXPORT_BLOCKED_HINT : 'Copia titolo e testo'}
+            className="px-5 py-2.5 bg-stone-900 hover:bg-stone-800 text-white font-semibold text-xs sm:text-sm rounded-xl transition-all flex items-center space-x-2 cursor-pointer shadow-xs whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {copiedId === currentReview.id ? (
               <>
@@ -385,8 +411,9 @@ export const ReviewDisplay: React.FC<ReviewDisplayProps> = ({
           {/* Download TXT */}
           <button
             onClick={() => handleDownloadTxt(currentReview)}
-            className="p-2.5 rounded-xl bg-white hover:bg-stone-50 text-stone-700 border border-stone-200 text-xs font-medium transition-colors cursor-pointer shadow-2xs"
-            title="Scarica file di testo (.txt)"
+            disabled={exportBlocked}
+            className="p-2.5 rounded-xl bg-white hover:bg-stone-50 text-stone-700 border border-stone-200 text-xs font-medium transition-colors cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+            title={exportBlocked ? EXPORT_BLOCKED_HINT : 'Scarica file di testo (.txt)'}
           >
             <Download className="w-4 h-4 text-indigo-600" />
           </button>
@@ -420,7 +447,7 @@ export const ReviewDisplay: React.FC<ReviewDisplayProps> = ({
             type="text"
             value={customRefinePrompt}
             onChange={(e) => setCustomRefinePrompt(e.target.value)}
-            placeholder="Chiedi una modifica mirata (es. 'Aggiungi una frase sulla presa salda')..."
+            placeholder="Chiedi una modifica mirata (es. 'Accorcia il secondo paragrafo')..."
             className="flex-1 px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
           />
           <button
