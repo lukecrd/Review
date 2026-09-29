@@ -1,12 +1,11 @@
 import React from 'react';
-import { Star, Sliders, MessageSquare, Clock, User, AlignLeft, Globe, Layers, Sparkles, Compass, Check } from 'lucide-react';
-import { ReviewOptions, ReviewTone, ReviewLength, TasteSkillPreset } from '../types';
+import { Star, Sliders, MessageSquare, Clock, User, AlignLeft, Globe, Layers, Sparkles, Compass, Check, Target, Package } from 'lucide-react';
+import { ReviewOptions, ReviewTone, ReviewLength, TasteSkillPreset, ReviewFocusAspect } from '../types';
 
 interface ReviewCustomizerProps {
   options: ReviewOptions;
   onChangeOptions: (newOptions: ReviewOptions) => void;
   onGenerate: () => void;
-  onCancel?: () => void;
   isLoading: boolean;
   disabled: boolean;
 }
@@ -41,6 +40,17 @@ const TASTE_PRESETS: Array<{
     subtitle: 'Narrazione in prima persona, aneddoti spontanei di routine ed empatia umana.',
     tag: 'Narrativo',
   },
+];
+
+const FOCUS_ASPECTS: Array<{
+  id: ReviewFocusAspect;
+  label: string;
+  desc: string;
+}> = [
+  { id: 'bilanciato', label: '🌟 Bilanciato Completo', desc: 'Analisi equilibrata di prestazioni, materiali e vita di tutti i giorni' },
+  { id: 'prestazioni', label: '⚡ Resa & Prova Pratica', desc: 'Focus su reattività, velocità, precisione ed efficacia operativa' },
+  { id: 'ergonomia', label: '🎒 Materiali, Tatto & Ingombro', desc: 'Focus su materiali, finiture, rumorosità e spazio occupato' },
+  { id: 'durata_manutenzione', label: '⏳ Manutenzione & Longevità', desc: 'Focus su pulizia, cicli di manutenzione e tenuta nel tempo' },
 ];
 
 const TONES: Array<{
@@ -89,11 +99,12 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
   options,
   onChangeOptions,
   onGenerate,
-  onCancel,
   isLoading,
   disabled,
 }) => {
   const currentTastePreset = options.tastePreset || 'editorial';
+  const currentFocus = options.focusAspect || 'bilanciato';
+  const featuresCount = (options.scrapedProduct?.keyFeatures?.length || 0) + (options.productFeatures?.length || 0);
 
   const handleRatingChange = (newRating: number) => {
     onChangeOptions({ ...options, rating: newRating });
@@ -101,6 +112,10 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
 
   const handleTastePresetChange = (preset: TasteSkillPreset) => {
     onChangeOptions({ ...options, tastePreset: preset });
+  };
+
+  const handleFocusChange = (focus: ReviewFocusAspect) => {
+    onChangeOptions({ ...options, focusAspect: focus });
   };
 
   return (
@@ -116,8 +131,55 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
             Fase 2
           </span>
           <h2 className="text-base sm:text-lg font-bold text-stone-900">
-            Personalizza lo Stile & Direttive Taste-Skill
+            Personalizza Angolazione & Direttive Taste-Skill
           </h2>
+        </div>
+      </div>
+
+      {/* Product Active Anchor Banner */}
+      {options.productName && (
+        <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <div className="flex items-center space-x-2">
+            <Package className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+            <span className="text-stone-700">
+              Recensione ancorata a: <strong className="text-indigo-950 font-bold">{options.productName}</strong>
+            </span>
+          </div>
+          <span className="text-[11px] font-semibold text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-indigo-100 self-start sm:self-auto whitespace-nowrap">
+            {featuresCount > 0 ? `${featuresCount} dettagli tecnici inclusi` : 'Analisi prodotto mirata'}
+          </span>
+        </div>
+      )}
+
+      {/* Focus Aspect Selector */}
+      <div className="space-y-2.5">
+        <label className="text-xs font-bold text-stone-800 flex items-center space-x-1.5">
+          <Target className="w-3.5 h-3.5 text-indigo-600" />
+          <span>Focus Principale della Narrazione:</span>
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {FOCUS_ASPECTS.map((f) => {
+            const isSelected = currentFocus === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => handleFocusChange(f.id)}
+                className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-stone-900 border-stone-900 text-white shadow-2xs'
+                    : 'bg-stone-50/70 border-stone-200 text-stone-700 hover:bg-stone-100'
+                }`}
+              >
+                <div className="text-xs font-bold mb-0.5">
+                  {f.label}
+                </div>
+                <p className={`text-[11px] leading-relaxed ${isSelected ? 'text-stone-300' : 'text-stone-500'}`}>
+                  {f.desc}
+                </p>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -129,7 +191,7 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
             <span>Preset di Stile Taste-Skill:</span>
           </label>
           <span className="text-[11px] font-semibold text-stone-500">
-            Design & Prosa calibrati
+            Prosa calibrata anti-slop
           </span>
         </div>
 
@@ -336,7 +398,7 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
         <div>
           <label className="text-xs font-bold text-stone-800 block mb-1.5 flex items-center space-x-1.5">
             <Layers className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Varianti:</span>
+            <span>Varianti & Diversità:</span>
           </label>
           <div className="grid grid-cols-3 gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200">
             {[1, 2, 3].map((num) => (
@@ -350,10 +412,15 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                {num} {num === 1 ? 'Opzione' : 'Opzioni'}
+                {num} {num === 1 ? 'Opzione' : 'Diverse'}
               </button>
             ))}
           </div>
+          {options.variantsCount > 1 && (
+            <p className="text-[10px] text-indigo-600 mt-1 font-medium">
+              ✨ Ciascuna variante adotterà un'angolazione, incipit e lessico autonomi.
+            </p>
+          )}
         </div>
 
       </div>
@@ -369,7 +436,7 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
           onChange={(e) =>
             onChangeOptions({ ...options, customNotes: e.target.value })
           }
-          placeholder="es. Usato durante i viaggi in treno, oppure commento sulla finitura satinata..."
+          placeholder="es. Usato per colazione in famiglia, oppure confrontato con modello precedente..."
           className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
         />
       </div>
@@ -382,42 +449,33 @@ export const ReviewCustomizer: React.FC<ReviewCustomizerProps> = ({
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <strong className="text-stone-900 font-bold">Standard Taste-Skill & No-AI-Slop:</strong>
+              <strong className="text-stone-900 font-bold">Standard Taste-Skill & Radicamento Prodotto:</strong>
               <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider">
-                Verificato
+                Attivo
               </span>
             </div>
             <p className="text-stone-600 text-[11px] mt-0.5 leading-relaxed">
-              Zero punti elenco robotici, nessun contrasto binario e ritmo di lettura autentico ad alta densità informativa.
+              Eliminazione di formule generiche ("ero titubante", "fa il suo dovere"), analisi dettagliata dei componenti reali e varianti a struttura asimmetrica.
             </p>
           </div>
         </div>
       </div>
 
       {/* Generate Action Button with 2:1 ratio */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        {isLoading && onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="w-full sm:w-auto py-3.5 px-5 bg-stone-200 hover:bg-stone-300 text-stone-800 font-semibold text-xs sm:text-sm rounded-2xl transition-all cursor-pointer whitespace-nowrap"
-          >
-            Annulla
-          </button>
-        )}
-        <button
-          onClick={onGenerate}
-          disabled={disabled || isLoading}
-          className="w-full py-3.5 px-7 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm sm:text-base rounded-2xl shadow-xs transition-all transform active:scale-[0.99] flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-        >
-          <Sparkles className="w-4.5 h-4.5 text-white" />
-          <span className="whitespace-nowrap">
-            {isLoading
-              ? 'Elaborazione Prosa Naturale in corso...'
-              : 'Genera Recensione con Taste-Skill'}
-          </span>
-        </button>
-      </div>
+      <button
+        onClick={onGenerate}
+        disabled={disabled || isLoading}
+        className="w-full py-3.5 px-7 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm sm:text-base rounded-2xl shadow-xs transition-all transform active:scale-[0.99] flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+      >
+        <Sparkles className="w-4.5 h-4.5 text-white" />
+        <span className="whitespace-nowrap">
+          {isLoading
+            ? 'Generazione Recensioni Specifiche in corso...'
+            : options.variantsCount > 1 
+              ? `Genera ${options.variantsCount} Varianti Dedicate al Prodotto`
+              : 'Genera Recensione Radicata nel Prodotto'}
+        </span>
+      </button>
     </section>
   );
 };
